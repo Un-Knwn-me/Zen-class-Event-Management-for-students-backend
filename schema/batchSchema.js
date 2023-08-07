@@ -6,17 +6,17 @@ const batchSchema = new mongoose.Schema(
   {
     batch: {
       type: String,
-      required: true
     },
-    start_date: {
+    startDate: {
       type: Date,
-      required: true
     },
     category: {
       type: String,
-      required: true
     },
-    mentors: {
+    mentor: {
+      type: String,
+    },
+    prevMentors: {
       type: [String],
       default: []
     },

@@ -1,12 +1,61 @@
 var express = require("express");
 var router = express.Router();
 const { UserModel } = require("../schema/userSchema");
-const { hashCompare, hashPassword, createToken } = require("../config/auth");
+const { hashCompare, hashPassword, createToken, isSignedIn } = require("../config/auth");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 fe_url = "http://localhost:3000";
 
+// Get all users
+router.get('/list', isSignedIn, async (req, res) => {
+  try {
+      const data = await UserModel.find({});
+      res.status(200).json({ users: data });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "Internal Server Error", error });
+    }
+});
+
+// Get user by id
+router.get('/:id', isSignedIn, async(req, res)=>{
+  try {
+      const { id } = req.params;
+      let user = await UserModel.findById(id);
+
+      res.status(200).json( user );
+  } catch (error) {
+      console.log(error);
+      res.status(500).json({ message:"Internal Server Error", error });
+  }
+})
+
+// Update user
+router.put("/update/:id", isSignedIn, async(req,res)=>{
+  try {
+      const { id } = req.params;
+      const updatedData = req.body;
+  
+      if (!id || !updatedData) {
+        return res.status(404).json({ message: "Bad Request or no Data had passed" });
+      }
+  
+      const user = await UserModel.findById(id);
+  
+      if (!user) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+  
+     const mentor = await UserModel.updateOne(req.body)
+      await user.save();
+  
+      res.status(200).json({ message: "Mentor updated successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({ message: "Internal Server Error", error });
+  }
+})
 
 router.post("/signup", async (req, res) => {
   try {
@@ -29,6 +78,7 @@ router.post("/signup", async (req, res) => {
 router.post("/signin", async (req, res) => {
   try {
     let user = await UserModel.findOne({ email: req.body.email });
+    console.log(req.body)
     if (user) {
       if (await hashCompare(req.body.password, user.password)) {
         let token = await createToken({

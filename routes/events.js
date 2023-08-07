@@ -2,10 +2,10 @@ var express = require("express");
 var router = express.Router();
 const moment = require("moment");
 const { EventModel } = require("../schema/eventSchema");
-const { isSignedIn, roleAdmin } = require("../config/auth");
+const { isSignedIn } = require("../config/auth");
 
 // Get all events
-router.get("/all-events", async (req, res) => {
+router.get("/all-events", isSignedIn, async (req, res) => {
   try {
     const events = await EventModel.find({}).sort({
       startDate: 1,
@@ -32,28 +32,28 @@ router.get("/all-events", async (req, res) => {
 });
 
 // Add new event
-router.post("/add", isSignedIn, roleAdmin, async (req, res) => {
+router.post("/add", isSignedIn, async (req, res) => {
   try {
     const createdBy = req.user.firstName + " " + req.user.lastName;
-    const startDateTime = moment(
-      req.body.startDateTime,
-      "YYYY-MM-DD HH:mm"
-    ).toDate();
-    const endDateTime = moment(
-      req.body.endDateTime,
-      "YYYY-MM-DD HH:mm"
-    ).toDate();
+    const Sdate = req.body.startDate;
+    const startDate = moment.parseZone(Sdate.substring(0, Sdate.length-6), 'YYYY-MM-DDTHH:mm').startOf("day").toDate();
+    const endDate =moment(startDate).add(1, "day").toDate();
+
+   
     // Check if the slot and batch are available for the event
     const existingEvent = await EventModel.findOne({
-      batch: req.body.batch,
-      startDateTime,
+      $and: [
+        { startDate: { $gte: startDate } },
+        { startDate: { $lt: endDate } },
+        { batch: req.body.batch }
+      ]
     });
-    if (!existingEvent) {
+   
+    if (!existingEvent) { 
       let data = new EventModel({
         ...req.body,
+        startDate: moment.parseZone(req.body.startDate).toDate(),
         createdBy,
-        startDate: startDateTime,
-        endDate: endDateTime,
         updatedBy: "",
         updatedAt: ""
       });
@@ -97,18 +97,21 @@ router.get("/bymonth", isSignedIn, async (req, res) => {
 });
 
 // Get events by date
-router.get("/bydate", isSignedIn, async (req, res) => {
-  const { date, month, year } = req.body;
-
+router.get("/bydate/:date", async (req, res) => {
   try {
-    const startDate = moment(`${year}-${month}-${date}`, "YYYY-MM-DD")
-      .startOf("day")
-      .toDate();
-    const endDate = moment(startDate).endOf("day").toDate();
+    const date = req.params.date;
+    const startDate = moment.parseZone(date.substring(0, date.length-6), 'YYYY-MM-DDTHH:mm:ss.SSS').startOf("day").toDate();
+    const endDate =moment(startDate).add(1, "day").toDate();
+
+    console.log(startDate, endDate)
+    
+    // const endDate = moment(startDate).endOf("day").toDate();
 
     const events = await EventModel.find({
-      startDate: { $gte: startDate },
-      endDate: { $lte: endDate },
+      $and: [
+        { startDate: { $gte: startDate } },
+        { startDate: { $lt: endDate } },
+      ]
     }).sort({ startDate: 1, startTime: 1 });
 
     if (events.length > 0) {
@@ -116,13 +119,14 @@ router.get("/bydate", isSignedIn, async (req, res) => {
     } else {
       res
         .status(404)
-        .json({ message: "No events found for the specified month and year" });
+        .json({ message: "No events found for the specified date" });
     }
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Internal Server Error", error });
   }
 });
+
 
 // Get events by week
 router.get("/byweek", isSignedIn, async (req, res) => {
@@ -149,8 +153,22 @@ router.get("/byweek", isSignedIn, async (req, res) => {
   }
 });
 
+// Get event by id
+router.get('/:id', isSignedIn, async(req, res)=>{
+  try {
+      const { id } = req.params;
+      let events = await EventModel.findById(id);
+
+      res.status(200).json( events );
+  } catch (error) {
+      console.log(error);
+      res.status(500).json({ message:"Internal Server Error", error });
+  }
+})
+
+
 // Update the event
-router.put("/update/:id", isSignedIn, roleAdmin, async (req, res) => {
+router.put("/update/:id", isSignedIn, async (req, res) => {
   try {
     const { id } = req.params;
     const updatedData = req.body;
@@ -168,27 +186,14 @@ router.put("/update/:id", isSignedIn, roleAdmin, async (req, res) => {
       return res.status(404).json({ message: "Event not found" });
     }
 
-    let updatedstartDate = event.startDate;
-    let updatedendDate = event.endDate;
-
-    if (updatedData.startDate) {
-      updatedstartDate = moment(
-        updatedData.startDate,
-        "DD.MM.YYYY",
-        true
-      ).toDate();
-    }
-
-    if (updatedData.endDate) {
-      updatedendDate = moment(updatedData.endDate, "DD.MM.YYYY", true).toDate();
-    }
-
     event.title = updatedData.title || event.title;
     event.description = updatedData.description || event.description;
     event.category = updatedData.category || event.category;
     event.venue = updatedData.venue || event.venue;
-    event.startDate = updatedstartDate;
-    event.endDate = updatedendDate;
+    event.batch = updatedData.batch || event.batch;
+    event.batchId = updatedData.batchId || event.batchId;
+    event.startDate = updatedData.startDate || event.startDate;
+    event.endDate = updatedData.endDate || event.endDate;
     event.updatedBy = updatedBy; // append the updated user
     event.updatedAt = Date.now(); // append the updated date and time
 
@@ -202,7 +207,7 @@ router.put("/update/:id", isSignedIn, roleAdmin, async (req, res) => {
 });
 
 // Delete an event
-router.delete("/delete/:id", isSignedIn, roleAdmin, async (req, res) => {
+router.delete("/delete/:id", isSignedIn, async (req, res) => {
   try {
     const { id } = req.params;
     const data = await EventModel.deleteOne({ _id: id });

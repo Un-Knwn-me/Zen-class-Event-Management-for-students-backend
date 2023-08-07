@@ -1,19 +1,45 @@
 var express = require("express");
 var router = express.Router();
-const { hashCompare, hashPassword, createToken, roleAdmin, isSignedIn } = require("../config/auth");
+const { hashCompare, hashPassword, createToken, isSignedIn } = require("../config/auth");
 const nodemailer = require("nodemailer");
 const { StudentModel } = require("../schema/batchSchema");
 require("dotenv").config();
 
 fe_url = "http://localhost:3000";
 
+// Get all students
+router.get('/list', isSignedIn, async (req, res) => {
+  try {
+      const data = await StudentModel.find({});
+      res.status(200).json({ students: data });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "Internal Server Error", error });
+    }
+});
+
+// Get student by id
+router.get('/:id', isSignedIn, async(req, res)=>{
+  try {
+      const { id } = req.params;
+      let student = await StudentModel.findById(id);
+
+      res.status(200).json( student );
+  } catch (error) {
+      console.log(error);
+      res.status(500).json({ message:"Internal Server Error", error });
+  }
+})
+
 // Add new student
-router.post("/add", isSignedIn, roleAdmin, async (req, res) => {
+router.post("/add", isSignedIn, async (req, res) => {
     try {
       let stud = await StudentModel.findOne({ email: req.body.email });
       let stuemail = req.body.email;
+      let pass = req.body.password
   
       if (!stud) {
+        req.body.password = await hashPassword(req.body.password);
         const createdBy = req.user.firstName + ' ' + req.user.lastName;
         let token = Math.random().toString(36).slice(-8); // Initialize token here
         let data = new StudentModel({ 
@@ -40,6 +66,7 @@ router.post("/add", isSignedIn, roleAdmin, async (req, res) => {
           to: stuemail,
           subject: "password for zen account",
           text: `Dear ${data.fullName}, 
+          Your password to login to Zen account is ${pass}.
           The Credential for your Zen account can be set through the following link: 
           ${fe_url}/reset-password/${data.id}/${token}`,
         };
@@ -171,7 +198,7 @@ router.post("/reset-password/:id/:token", async (req, res) => {
 });
 
 // Update student
-router.put("/update/:id", isSignedIn, roleAdmin, async(req,res)=>{
+router.put("/update/:id", isSignedIn, async(req,res)=>{
     try {
         const { id } = req.params;
         const updatedData = req.body;
@@ -180,14 +207,18 @@ router.put("/update/:id", isSignedIn, roleAdmin, async(req,res)=>{
           return res.status(404).json({ message: "Bad Request or no Data had passed" });
         }
     
-        const batch = await StudentModel.findById(id);
+        const stud = await StudentModel.findById(id);
     
-        if (!batch) {
+        if (!stud) {
           return res.status(404).json({ message: "Student not found" });
         }
     
-       const stud = await StudentModel.updateOne(req.body)
-        await batch.save();
+        stud.fullName = updatedData.fullName || stud.fullName;
+        stud.email = updatedData.email || stud.email;
+        stud.mobile = updatedData.mobile || stud.mobile;
+        stud.batch = updatedData.batch || stud.batch;
+
+        await stud.save();
     
         res.status(200).json({ message: "Student updated successfully" });
     } catch (error) {
@@ -197,7 +228,7 @@ router.put("/update/:id", isSignedIn, roleAdmin, async(req,res)=>{
   })
 
 // Delete student
-router.delete('/delete/:id', isSignedIn, roleAdmin, async(req, res)=> {
+router.delete('/delete/:id', isSignedIn, async(req, res)=> {
     try {
         const { id } = req.params;
         const data = await StudentModel.deleteOne({ _id: id });

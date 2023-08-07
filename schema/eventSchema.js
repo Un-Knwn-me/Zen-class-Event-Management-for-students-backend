@@ -35,6 +35,13 @@ const eventSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    batchId:{ 
+        type: String
+    },
+    students: {
+        type: [String],
+        default: []
+    },
     hostedBy: {
         type: String,
         required: true

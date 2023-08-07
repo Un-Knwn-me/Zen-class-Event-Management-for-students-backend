@@ -49,29 +49,5 @@ const isSignedIn = async (req, res, next) => {
   }
 };
 
-const roleAdmin = async (req, res, next) => {
-  try {
-    if (req.headers.authorization) {
-      const authHeader = req.headers.authorization;
-      const token = authHeader && authHeader.split(" ")[1];
-      const decodedToken = decodeToken(token);
 
-      if (!decodedToken) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      if (decodedToken.role === "Mentor") {
-        next();
-      } else {
-        return res.status(401).json({ message: "Admin only" });
-      }
-    } else {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-  } catch (error) {
-    console.log(error);
-    return res.status(500).json({ message: "Invalid Authentication" });
-  }
-};
-
-module.exports = { hashCompare, hashPassword, createToken, decodeToken, isSignedIn, roleAdmin };
+module.exports = { hashCompare, hashPassword, createToken, decodeToken, isSignedIn };
