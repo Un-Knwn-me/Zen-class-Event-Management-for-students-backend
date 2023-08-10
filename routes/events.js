@@ -4,6 +4,7 @@ const moment = require("moment");
 const { EventModel } = require("../schema/eventSchema");
 const { isSignedIn } = require("../config/auth");
 
+
 // Get all events
 router.get("/all-events", isSignedIn, async (req, res) => {
   try {
@@ -158,8 +159,22 @@ router.get('/:id', isSignedIn, async(req, res)=>{
   try {
       const { id } = req.params;
       let events = await EventModel.findById(id);
+    if(!events){
+      res.status(404).json({ message: "No data" })
+    }
 
-      res.status(200).json( events );
+    const outputFormat = 'MMM DD YYYY, hh:mm A';
+   
+    const formattedEvents = {
+      ...events._doc,
+    startDate: moment(events.startDate).format(outputFormat),
+    endDate: moment(events.endDate).format(outputFormat),
+    createdAt: moment(events.createdAt).format(outputFormat),
+    }
+    if (events.updatedAt) {
+      formattedEvents.updatedAt = moment(events.updatedAt).format(outputFormat);
+    }
+    res.status(200).json(formattedEvents);
   } catch (error) {
       console.log(error);
       res.status(500).json({ message:"Internal Server Error", error });

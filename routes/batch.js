@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 const { isSignedIn } = require('../config/auth');
 const { BatchModel } = require('../schema/batchSchema');
+const moment = require("moment");
 require('dotenv').config();
 
 // Get all batch list
@@ -20,8 +21,21 @@ router.get('/:id', isSignedIn, async(req, res)=>{
   try {
       const { id } = req.params;
       let batch = await BatchModel.findById(id);
-
-      res.status(200).json( batch );
+      if(!batch){
+        res.status(404).json({ message: "No data" })
+      }
+  
+      const outputFormat = 'MMM DD YYYY, hh:mm A';
+     
+      const formattedBatch = {
+        ...batch._doc,
+      startDate: moment(batch.startDate).format(outputFormat),
+      createdAt: moment(batch.createdAt).format(outputFormat),
+      }
+      if (batch.updatedAt) {
+        formattedBatch.updatedAt = moment(batch.updatedAt).format(outputFormat);
+      }
+      res.status(200).json( formattedBatch );
   } catch (error) {
       console.log(error);
       res.status(500).json({ message:"Internal Server Error", error });

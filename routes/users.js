@@ -3,9 +3,10 @@ var router = express.Router();
 const { UserModel } = require("../schema/userSchema");
 const { hashCompare, hashPassword, createToken, isSignedIn } = require("../config/auth");
 const nodemailer = require("nodemailer");
+const moment = require("moment");
 require("dotenv").config();
 
-fe_url = "http://localhost:3000";
+fe_url = "https://zenclass-event-management-app.netlify.app";
 
 // Get all users
 router.get('/list', isSignedIn, async (req, res) => {
@@ -23,8 +24,20 @@ router.get('/:id', isSignedIn, async(req, res)=>{
   try {
       const { id } = req.params;
       let user = await UserModel.findById(id);
-
-      res.status(200).json( user );
+      if(!user){
+        res.status(404).json({ message: "No data" })
+      }
+  
+      const outputFormat = 'MMM DD YYYY, hh:mm A';
+     
+      const formattedUser = {
+        ...user._doc,
+      createdAt: moment(user.createdAt).format(outputFormat),
+      }
+      if (user.updatedAt) {
+        formattedUser.updatedAt = moment(user.updatedAt).format(outputFormat);
+      }
+      res.status(200).json( formattedUser );
   } catch (error) {
       console.log(error);
       res.status(500).json({ message:"Internal Server Error", error });

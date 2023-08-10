@@ -2,10 +2,11 @@ var express = require("express");
 var router = express.Router();
 const { hashCompare, hashPassword, createToken, isSignedIn } = require("../config/auth");
 const nodemailer = require("nodemailer");
+const moment = require("moment");
 const { StudentModel } = require("../schema/batchSchema");
 require("dotenv").config();
 
-fe_url = "http://localhost:3000";
+fe_url = "https://zenclass-event-management-app.netlify.app";
 
 // Get all students
 router.get('/list', isSignedIn, async (req, res) => {
@@ -23,8 +24,20 @@ router.get('/:id', isSignedIn, async(req, res)=>{
   try {
       const { id } = req.params;
       let student = await StudentModel.findById(id);
-
-      res.status(200).json( student );
+      if(!student){
+        res.status(404).json({ message: "No data" })
+      }
+  
+      const outputFormat = 'MMM DD YYYY, hh:mm A';
+     
+      const formattedStudent = {
+        ...student._doc,
+      createdAt: moment(student.createdAt).format(outputFormat),
+      }
+      if (student.updatedAt) {
+        formattedStudent.updatedAt = moment(student.updatedAt).format(outputFormat);
+      }
+      res.status(200).json( formattedStudent );
   } catch (error) {
       console.log(error);
       res.status(500).json({ message:"Internal Server Error", error });
